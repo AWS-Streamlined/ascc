@@ -1,0 +1,13 @@
+{
+  "stackName": "tl",
+  "repositoryParameters": {
+    "type": "GITHUB_REPO",
+    "owner": "louislatreille",
+    "repo": "test-sst",
+    "branch": "main",
+    "oauthTokenSecretName": "cicd-github-token"
+  },
+  "deployToRegions": ["us-east-1", "us-east-2"],
+  "manualApprovalBeforeProdDeployment": true,
+  "manualApprovalSubscribers": ["louis_latreille@hotmail.com"]
+}
