@@ -23,7 +23,11 @@ yargs
         });
     },
     async (args) => {
-      await validateJsonParameters(args["params-file"]);
+      const valid = await validateJsonParameters(args["params-file"]);
+
+      if (!valid) {
+        return;
+      }
 
       const parameters = ["exec", "sst", "deploy", "--", "--stage", "prod"];
 
@@ -50,7 +54,11 @@ yargs
         });
     },
     async (args) => {
-      await validateJsonParameters(args["params-file"]);
+      const valid = await validateJsonParameters(args["params-file"]);
+
+      if (!valid) {
+        return;
+      }
 
       const parameters = ["exec", "sst", "remove", "--", "--stage", "prod"];
 
@@ -62,15 +70,16 @@ yargs
     },
   ).argv;
 
-async function validateJsonParameters(paramsFilePath: string) {
+async function validateJsonParameters(paramsFilePath: string): Promise<boolean> {
   const cicdParametersJson = await readFile(paramsFilePath, { encoding: "utf8" });
 
   const valid = jsonParametersSchema(JSON.parse(cicdParametersJson));
 
   if (!valid) {
     console.error("Invalid parameters file!", jsonParametersSchema.errors);
-    return;
+    return false;
   }
 
   await writeFile(`${processPath}/stacks/cicd_parameters.json`, cicdParametersJson);
+  return true;
 }
