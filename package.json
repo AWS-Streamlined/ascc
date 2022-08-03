@@ -1,6 +1,6 @@
 {
   "name": "ascc",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "",
   "files": [
     "bin/**"
@@ -10,7 +10,8 @@
   },
   "main": "src/index.ts",
   "scripts": {
-    "build": "rm -f -R ./bin && tsc -p tsconfig.build.json -d && rsync -av src/cicd/ bin/cicd/ --exclude .build --exclude .sst --exclude node_modules --exclude .gitignore --exclude vitest.config.ts"
+    "build": "rm -f -R ./bin && tsc -p tsconfig.build.json -d && rsync -av src/cicd/ bin/cicd/ --exclude .build --exclude .sst --exclude node_modules --exclude .gitignore --exclude vitest.config.ts",
+    "publishVersion": "npm run build && npm publish"
   },
   "repository": {
     "type": "git",
