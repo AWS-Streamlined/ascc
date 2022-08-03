@@ -8,7 +8,7 @@
   "bin": {
     "ascc": "bin/index.js"
   },
-  "main": "bin/index.js",
+  "main": "src/index.ts",
   "scripts": {
     "build": "rm -f -R ./bin && tsc -p tsconfig.build.json -d && rsync -av src/cicd/ bin/cicd/ --exclude .build --exclude .sst --exclude node_modules --exclude .gitignore --exclude vitest.config.ts"
   },

@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import yargs, { Argv } from "yargs";
-import { spawn, sync } from "cross-spawn";
+import { spawn } from "cross-spawn";
 import { readFile, writeFile } from "fs/promises";
 import { jsonParametersSchema } from "./jsonParametersSchema";
 
-const { stdout } = sync("npm", ["config", "get", "prefix"], { env: process.env, stdio: "pipe", encoding: "utf-8" });
-const processPath = `${stdout.trim()}/lib/node_modules/ascc/bin/cicd`;
+const processPath = `${__dirname}/cicd`;
 
 yargs
   .command(
