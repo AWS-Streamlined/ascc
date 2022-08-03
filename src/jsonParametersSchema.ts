@@ -50,6 +50,12 @@ export const jsonParametersSchema = ajv.compile({
         },
       ],
     },
+    buildDockerfilePath: {
+      description:
+        "Path to the Dockerfile that will build/test/etc. your application. This Dockerfile should be committed into your application's repository. This should be a path relative to the root of your repository.",
+      type: "string",
+      minLength: 1,
+    },
     deployToRegions: {
       description:
         "List of AWS regions where ASCC should should deploy your application. Alpha/Staging/Prod environments will be deployed to all of these regions",
@@ -73,5 +79,5 @@ export const jsonParametersSchema = ajv.compile({
       },
     },
   },
-  required: ["stackName", "repositoryParameters", "deployToRegions"],
+  required: ["stackName", "repositoryParameters", "buildDockerfilePath", "deployToRegions"],
 });

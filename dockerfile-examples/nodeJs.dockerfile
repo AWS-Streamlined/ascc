@@ -2,7 +2,7 @@ FROM public.ecr.aws/docker/library/node:16-bullseye-slim
 
 WORKDIR /build
 
-# Copy all the necessary files to build the SST application
+# Copy all the necessary files to build the SST application. Source file paths should be relative to the root of your repository
 COPY tsconfig.json /build/
 COPY sst.json /build/
 COPY package.json /build/

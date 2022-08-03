@@ -14,6 +14,7 @@ type GitHubRepositoryParameters = {
 export type CicdParameters = {
   stackName: string;
   repositoryParameters: GitHubRepositoryParameters;
+  buildDockerfilePath: string;
   deployToRegions: string[];
   manualApprovalBeforeProdDeployment?: boolean;
   manualApprovalSubscribers?: string[];
@@ -23,6 +24,7 @@ export const buildCicdStack = (params: CicdParameters) => {
   const fn = ({ app, stack }: StackContext) => {
     const stackName = params.stackName;
     const repositorySettings = params.repositoryParameters;
+    const dockerfilePath = params.buildDockerfilePath;
     const deployToRegions = params.deployToRegions;
     const manualApprovalBeforeProd = params.manualApprovalBeforeProdDeployment;
     const emailSubscribers = params.manualApprovalSubscribers;
@@ -53,7 +55,7 @@ export const buildCicdStack = (params: CicdParameters) => {
           version: "0.2",
           phases: {
             pre_build: {
-              commands: ["docker build -t build-image ."],
+              commands: [`docker build -t build-image --file ${dockerfilePath} .`],
             },
             build: {
               commands: [
