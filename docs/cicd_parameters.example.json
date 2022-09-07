@@ -1,14 +1,30 @@
 {
-  "stackName": "tl",
+  "stackName": "test-ascc-cicd",
   "repositoryParameters": {
     "type": "GITHUB_REPO",
     "owner": "louislatreille",
     "repo": "test-sst",
     "branch": "main",
-    "oauthTokenSecretName": "cicd-github-token"
+    "personnalTokenSecretName": "cicd-github-token"
   },
   "buildDockerfilePath": "./cicd/Dockerfile",
-  "deployToRegions": ["us-east-1", "us-east-2"],
-  "manualApprovalBeforeProdDeployment": true,
-  "manualApprovalSubscribers": ["louis_latreille@hotmail.com"]
+  "stages": [
+    {
+      "name": "Alpha",
+      "awsAccountId": "123456789012",
+      "deployToRegions": ["us-east-1"]
+    },
+    {
+      "name": "Staging",
+      "awsAccountId": "123456789012",
+      "deployToRegions": ["us-east-1", "us-east-2"]
+    },
+    {
+      "name": "Prod",
+      "awsAccountId": "098765432109",
+      "deployToRegions": ["us-east-1", "us-east-2"],
+      "manualApprovalBeforeDeployment": true,
+      "manualApprovalSubscribers": ["louis_latreille@hotmail.com"]
+    }
+  ]
 }

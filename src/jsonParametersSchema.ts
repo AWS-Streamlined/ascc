@@ -24,9 +24,9 @@ export const jsonParametersSchema = ajv.compile({
               type: "string",
               pattern: `^GITHUB_REPO$`,
             },
-            oauthTokenSecretName: {
+            personnalTokenSecretName: {
               description:
-                "The name of the SecretsManager secret that stores your GitHub OAuth token. This secret should be created in us-east-1 region.",
+                "The name of the SecretsManager secret that stores your GitHub personnal access token. This secret should be created in us-east-1 region.",
               type: "string",
               minLength: 1,
             },
@@ -46,7 +46,7 @@ export const jsonParametersSchema = ajv.compile({
               minLength: 1,
             },
           },
-          required: ["type", "oauthTokenSecretName", "owner", "repo", "branch"],
+          required: ["type", "personnalTokenSecretName", "owner", "repo", "branch"],
         },
       ],
     },
@@ -56,28 +56,47 @@ export const jsonParametersSchema = ajv.compile({
       type: "string",
       minLength: 1,
     },
-    deployToRegions: {
-      description:
-        "List of AWS regions where ASCC should should deploy your application. Alpha/Staging/Prod environments will be deployed to all of these regions",
+    stages: {
+      description: "List of parameters for each stage to deploy to",
       type: "array",
       items: {
-        type: "string",
-        minLength: 5,
-      },
-    },
-    manualApprovalBeforeProdDeployment: {
-      description:
-        "(Optional) Set this to true if you want an approval gate before your application is deployed to the production environment. The CICD pipeline will halt at this point.",
-      type: "boolean",
-    },
-    manualApprovalSubscribers: {
-      description: "(Optional) List of emails that should receive a notification when a pipeline execution has reached the approval gate.",
-      type: "array",
-      items: {
-        type: "string",
-        format: "email",
+        type: "object",
+        properties: {
+          name: {
+            description: "Name of the stage",
+            type: "string",
+            minLength: 1,
+          },
+          awsAccountId: {
+            description: "The ID of the AWS account that will receive this stage",
+            type: "string",
+            minLength: 12,
+          },
+          deployToRegions: {
+            description: "List of AWS regions where ASCC should should deploy your application",
+            type: "array",
+            items: {
+              type: "string",
+              minLength: 5,
+            },
+          },
+          manualApprovalBeforeDeployment: {
+            description:
+              "(Optional) Set this to true if you want an approval gate before your application is deployed to this stage. The CICD pipeline will halt at this point.",
+            type: "boolean",
+          },
+          manualApprovalSubscribers: {
+            description: "(Optional) List of emails that should receive a notification when a pipeline execution has reached the approval gate.",
+            type: "array",
+            items: {
+              type: "string",
+              format: "email",
+            },
+          },
+        },
+        required: ["name", "awsAccountId", "deployToRegions"],
       },
     },
   },
-  required: ["stackName", "repositoryParameters", "buildDockerfilePath", "deployToRegions"],
+  required: ["stackName", "repositoryParameters", "buildDockerfilePath", "stages"],
 });

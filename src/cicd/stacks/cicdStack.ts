@@ -1,44 +1,30 @@
 import { StackContext } from "@serverless-stack/resources";
 import { SecretValue } from "aws-cdk-lib";
 import { Artifact, Pipeline } from "aws-cdk-lib/aws-codepipeline";
-import { CodeBuildAction, GitHubSourceAction, GitHubSourceActionProps, ManualApprovalAction } from "aws-cdk-lib/aws-codepipeline-actions";
+import { CodeBuildAction, GitHubSourceAction, ManualApprovalAction } from "aws-cdk-lib/aws-codepipeline-actions";
 import { BuildSpec, LinuxBuildImage, PipelineProject } from "aws-cdk-lib/aws-codebuild";
 import { Effect, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Subscription, SubscriptionProtocol, Topic } from "aws-cdk-lib/aws-sns";
-
-type GitHubRepositoryParameters = {
-  type: "GITHUB_REPO";
-  oauthTokenSecretName: string;
-} & Pick<GitHubSourceActionProps, "owner" | "repo" | "branch">;
-
-export type CicdParameters = {
-  stackName: string;
-  repositoryParameters: GitHubRepositoryParameters;
-  buildDockerfilePath: string;
-  deployToRegions: string[];
-  manualApprovalBeforeProdDeployment?: boolean;
-  manualApprovalSubscribers?: string[];
-};
+import { CicdParameters } from "./types";
 
 export const buildCicdStack = (params: CicdParameters) => {
-  const fn = ({ app, stack }: StackContext) => {
+  return ({ app, stack }: StackContext) => {
     const stackName = params.stackName;
     const repositorySettings = params.repositoryParameters;
     const dockerfilePath = params.buildDockerfilePath;
-    const deployToRegions = params.deployToRegions;
-    const manualApprovalBeforeProd = params.manualApprovalBeforeProdDeployment;
-    const emailSubscribers = params.manualApprovalSubscribers;
 
     const githubArtifacts = new Artifact();
     //const buildArtifacts = new Artifact(); // TODO use that when sst can deploy from a build directory
 
-    const pipeline = new Pipeline(stack, `${stackName}-pipeline`);
+    const pipeline = new Pipeline(stack, `${stackName}-pipeline`, {
+      pipelineName: `${stackName}-pipeline`,
+    });
 
     const sourceAction = new GitHubSourceAction({
-      actionName: "GitHubSource",
+      actionName: "SourceRepository",
       owner: repositorySettings.owner,
       repo: repositorySettings.repo,
-      oauthToken: SecretValue.secretsManager(repositorySettings.oauthTokenSecretName),
+      oauthToken: SecretValue.secretsManager(repositorySettings.personnalTokenSecretName),
       output: githubArtifacts,
       branch: repositorySettings.branch,
     });
@@ -51,6 +37,7 @@ export const buildCicdStack = (params: CicdParameters) => {
     const buildServicesAction = new CodeBuildAction({
       actionName: "BuildServices",
       project: new PipelineProject(stack, `${stackName}-build`, {
+        projectName: `${stackName}-build`,
         buildSpec: BuildSpec.fromObject({
           version: "0.2",
           phases: {
@@ -80,99 +67,97 @@ export const buildCicdStack = (params: CicdParameters) => {
       actions: [buildServicesAction],
     });
 
-    const deployRole = new Role(stack, `${stackName}-deploy-role`, {
-      inlinePolicies: {
-        test: new PolicyDocument({
-          statements: [
-            new PolicyStatement({
-              effect: Effect.ALLOW,
-              actions: ["*"],
-              resources: ["*"],
-            }),
-          ],
-        }),
-      },
-      assumedBy: new ServicePrincipal("codebuild.amazonaws.com"),
-    });
-    const deployActionPerStageForAllRegions: { [stageName: string]: CodeBuildAction[] } = {};
+    for (const stage of params.stages) {
+      const stageName = stage.name;
+      const deployActions = [];
+      const targetRoleArn = `arn:aws:iam::${stage.awsAccountId}:role/${stackName}-${stageName}-AsccTargetDeploymentRole`;
+      const codeBuildDeployRole = new Role(stack, `${stackName}-${stageName}-cb-deployment-role`, {
+        roleName: `${stackName}-${stageName}-cb-deployment-role`,
+        inlinePolicies: {
+          assumeCrossAccountRole: new PolicyDocument({
+            statements: [
+              new PolicyStatement({
+                effect: Effect.ALLOW,
+                actions: ["sts:AssumeRole"],
+                resources: [targetRoleArn],
+              }),
+            ],
+          }),
+        },
+        assumedBy: new ServicePrincipal("codebuild.amazonaws.com"),
+      });
 
-    for (const stage of ["alpha", "staging", "prod"]) {
-      deployActionPerStageForAllRegions[stage] = [];
+      stack.addOutputs({
+        [`${stageName}DeploymentRoleArn`]: codeBuildDeployRole.roleArn,
+      });
 
-      for (const region of deployToRegions) {
+      for (const region of stage.deployToRegions) {
         const deployAction = new CodeBuildAction({
           actionName: `deploy-services-${region}`,
-          project: new PipelineProject(stack, `${stackName}-${stage}-deploy-${region}`, {
+          project: new PipelineProject(stack, `${stackName}-${stageName}-deploy-${region}`, {
+            projectName: `${stackName}-${stageName}-deploy-${region}`,
             buildSpec: BuildSpec.fromObject({
               version: "0.2",
               phases: {
+                install: {
+                  commands: ["apt-get update", "apt-get install -y awscli jq"],
+                },
                 pre_build: {
                   //commands: ["npm install -g aws-cdk", "cd $CODEBUILD_SRC_DIR/.build"], // TODO use that when sst can deploy from a build directory
-                  commands: ["npm install"],
+                  commands: [
+                    `TEMP_ROLE=$(aws sts assume-role --role-arn ${targetRoleArn} --role-session-name AsccDeployment --duration-seconds 1800)`,
+                    `export AWS_ACCESS_KEY_ID=$(echo "\${TEMP_ROLE}" | jq -r '.Credentials.AccessKeyId')`,
+                    `export AWS_SECRET_ACCESS_KEY=$(echo "\${TEMP_ROLE}" | jq -r '.Credentials.SecretAccessKey')`,
+                    `export AWS_SESSION_TOKEN=$(echo "\${TEMP_ROLE}" | jq -r '.Credentials.SessionToken')`,
+                    "npm install",
+                  ],
                 },
                 build: {
-                  commands: [`npm run deploy -- --stage ${stage} --region ${region}`],
+                  commands: [`npx sst deploy --stage ${stageName} --region ${region}`],
                 },
               },
             }),
             environment: {
               buildImage: LinuxBuildImage.fromDockerRegistry("public.ecr.aws/docker/library/node:16-bullseye-slim"),
             },
-            role: deployRole,
+            role: codeBuildDeployRole,
           }),
           //input: buildArtifacts, // TODO use that when sst can deploy from a build directory
           input: githubArtifacts,
         });
 
-        deployActionPerStageForAllRegions[stage].push(deployAction);
+        deployActions.push(deployAction);
       }
-    }
 
-    pipeline.addStage({
-      stageName: "DeployToAlpha",
-      actions: deployActionPerStageForAllRegions["alpha"],
-    });
+      // TODO eventually add some end-to-end tests with AWS Lambda here
 
-    // TODO eventually add some end-to-end tests with AWS Lambda here
+      if (stage.manualApprovalBeforeDeployment && stage.manualApprovalSubscribers) {
+        const snsTopic = new Topic(stack, `${stackName}-${stageName}-approval`);
 
-    pipeline.addStage({
-      stageName: "DeployToStaging",
-      actions: deployActionPerStageForAllRegions["staging"],
-    });
+        for (const email of stage.manualApprovalSubscribers) {
+          new Subscription(stack, `${stackName}-${stageName}-approval-sub-${email.substring(0, email.indexOf("@"))}`, {
+            topic: snsTopic,
+            protocol: SubscriptionProtocol.EMAIL,
+            endpoint: email,
+          });
+        }
 
-    // TODO eventually add some end-to-end tests with AWS Lambda here
+        const manualApproval = new ManualApprovalAction({
+          actionName: `manual-approval-${stageName}-deploy`,
+          notificationTopic: snsTopic,
+          additionalInformation: `The build for your application ${stackName} is ready to be deployed to ${stageName}! Review that everything is ok, and approve the deployment!`,
+        });
 
-    if (manualApprovalBeforeProd && emailSubscribers) {
-      const snsTopic = new Topic(stack, `${stackName}-prod-approval`);
-
-      for (const email of emailSubscribers) {
-        new Subscription(stack, `${stackName}-prod-approval-sub-${email.substring(0, email.indexOf("@"))}`, {
-          topic: snsTopic,
-          protocol: SubscriptionProtocol.EMAIL,
-          endpoint: email,
+        pipeline.addStage({
+          stageName: `${stageName}Approval`,
+          actions: [manualApproval],
         });
       }
 
-      const manualApproval = new ManualApprovalAction({
-        actionName: `manual-approval-prod-deploy`,
-        notificationTopic: snsTopic,
-        additionalInformation: `The build for your application ${stackName} is ready to be deployed to production! Review that everything is ok, and approval the deployment!`,
-      });
-
       pipeline.addStage({
-        stageName: "ProdApproval",
-        actions: [manualApproval],
+        stageName: `DeployTo${stageName}`,
+        actions: deployActions,
       });
     }
-
-    pipeline.addStage({
-      stageName: "DeployToProd",
-      actions: deployActionPerStageForAllRegions["prod"],
-    });
   };
-
-  // Name the return function, as this is what SST uses to name stacks
-  Object.defineProperty(fn, "name", { value: params.stackName });
-
-  return fn;
 };

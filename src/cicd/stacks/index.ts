@@ -1,6 +1,7 @@
-import { CicdParameters, buildCicdStack } from "./cicdStack";
+import { buildCicdStack } from "./cicdStack";
 import { App } from "@serverless-stack/resources";
 import { readFile } from "fs/promises";
+import { CicdParameters } from "./types";
 
 export default async function (app: App) {
   const cicdParametersJson = await readFile("./stacks/cicd_parameters.json", { encoding: "utf8" });
@@ -13,5 +14,5 @@ export default async function (app: App) {
       format: "esm",
     },
   });
-  app.stack(buildCicdStack(cicdParameters));
+  app.stack(buildCicdStack(cicdParameters), { id: `${cicdParameters.stackName}` });
 }
