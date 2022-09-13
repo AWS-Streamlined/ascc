@@ -1,8 +1,8 @@
 # AWS Streamlined CI/CD - ASCC
 
-ASCC aims at simplifying the creation of a proper CI/CD pipeline for SST applications, using AWS CodePipeline.
+ASCC aims at simplifying the creation of a proper CI/CD pipeline for applications, using AWS CodePipeline.
 
-Pipelines created with this utility are able to deploy to any number of specified regions, and have three stages: alpha, staging, prod.
+Pipelines created with this utility are able to deploy to any number of specified regions, stages, and AWS accounts.
 
 Here's what the pipeline looks like:
 
@@ -10,8 +10,8 @@ Here's what the pipeline looks like:
 
 ## Supported Languages
 
-Currently, this pipeline only supports NodeJS SST applications. It should be possible to build a pipeline for any kind of SST
-applications with docker. Feel free to open pull requests to add other Dockerfiles for other languages.
+Currently, this pipeline only supports NodeJS SST applications. It should be possible to build a pipeline for any kind of
+application and framework, with the help of docker containers. Feel free to open pull requests to add other Dockerfiles for other languages/frameworks!
 
 ## Supported Repository Providers
 
